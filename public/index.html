@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kazuri — Career Coach (Prototype)</title>
+<style>
+  :root {
+    --green-deep: #046A38;
+    --green: #00A651;
+    --green-bright: #3DDC84;
+    --cream: #F7F8F5;
+    --ink: #10231A;
+    --ink-soft: #4A5C52;
+    --border: #DCE5DF;
+    --amber: #C77D00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  }
+  header {
+    background: linear-gradient(135deg, var(--green-deep), var(--green));
+    color: #fff;
+    padding: 22px 24px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::after {
+    content: "";
+    position: absolute;
+    right: -40px; top: -40px;
+    width: 160px; height: 160px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+  .brand-row { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px;
+    border: 1px solid rgba(255,255,255,0.3);
+  }
+  header h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: 0.2px; }
+  header p { margin: 2px 0 0; font-size: 12.5px; opacity: 0.85; }
+  .proto-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 10px; font-size: 11px; font-weight: 600;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 4px 10px; border-radius: 20px;
+    position: relative; z-index: 1;
+  }
+  .proto-tag .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-bright); }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(0,166,81,0.04), transparent 40%);
+  }
+  .msg { display: flex; flex-direction: column; max-width: 84%; animation: rise 0.25s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .msg.bot { align-self: flex-start; }
+  .msg.user { align-self: flex-end; }
+  .bubble {
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .msg.bot .bubble {
+    background: #EFF6F1;
+    border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+    color: var(--ink);
+  }
+  .msg.bot .bubble p { margin: 0 0 8px; }
+  .msg.bot .bubble p:last-child { margin-bottom: 0; }
+  .msg.bot .bubble ul { margin: 4px 0 8px 18px; padding: 0; }
+  .msg.bot .bubble li { margin-bottom: 4px; }
+  .msg.bot .bubble ul:last-child { margin-bottom: 0; }
+  .msg.user .bubble {
+    background: var(--green);
+    color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .grounded-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 5px; font-size: 10.5px; font-weight: 600;
+    color: var(--green-deep);
+    opacity: 0.75;
+  }
+  .grounded-tag.uncertain { color: var(--amber); }
+  .grounded-tag svg { width: 11px; height: 11px; }
+
+  .quick-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 0 20px 14px;
+  }
+  .quick-btn {
+    font-size: 12.5px; padding: 7px 12px;
+    border-radius: 18px; border: 1px solid var(--border);
+    background: #fff; color: var(--green-deep);
+    cursor: pointer; font-weight: 600;
+    transition: 0.15s;
+  }
+  .quick-btn:hover { background: #EFF6F1; border-color: var(--green); }
+
+  .input-row {
+    display: flex; gap: 10px;
+    padding: 14px 20px 20px;
+    border-top: 1px solid var(--border);
+    background: #fff;
+  }
+  .input-row input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    font-size: 14.5px;
+    outline: none;
+  }
+  .input-row input:focus { border-color: var(--green); }
+  .input-row button {
+    background: var(--green);
+    color: #fff; border: none;
+    padding: 0 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .input-row button:disabled { opacity: 0.5; cursor: default; }
+
+  .typing { display: flex; gap: 4px; padding: 4px 0; }
+  .typing span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+  footer.credit {
+    text-align: center; font-size: 10.5px; color: var(--ink-soft);
+    padding: 8px 0 14px; background: #fff;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand-row">
+      <div class="avatar">K</div>
+      <div>
+        <h1>Kazuri Career Coach</h1>
+        <p>Safaricom Internship Assistant</p>
+      </div>
+    </div>
+    <div class="proto-tag"><span class="dot"></span> Prototype — grounded-answer concept by Mitchell Muyu</div>
+  </header>
+
+  <div class="chat-area" id="chatArea"></div>
+
+  <div class="quick-row" id="quickRow">
+    <button class="quick-btn" data-q="How do I apply for a Safaricom internship?">How do I apply?</button>
+    <button class="quick-btn" data-q="What is the internship stipend?">What's the stipend?</button>
+    <button class="quick-btn" data-q="What happens after I apply?">What happens after I apply?</button>
+  </div>
+
+  <div class="input-row">
+    <input type="text" id="userInput" placeholder="Ask about the internship..." />
+    <button id="sendBtn">Send</button>
+  </div>
+  <footer class="credit">Portfolio prototype · not an official Safaricom product</footer>
+</div>
+
+<script>
+  const chatArea = document.getElementById('chatArea');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const quickRow = document.getElementById('quickRow');
+
+  let history = [];
+
+  const UNCERTAIN_MARKERS = ["don't have that confirmed", "not confirmed", "isn't confirmed", "official Safaricom Careers portal", "don't know the exact", "can't confirm"];
+
+ function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatMessage(text) {
+    const escaped = escapeHtml(text);
+    const blocks = escaped.split(/\n\s*\n/);
+    return blocks.map(block => {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      const isList = lines.length > 0 && lines.every(l => l.startsWith('- ') || l.startsWith('* '));
+      if (isList) {
+        const items = lines.map(l => '<li>' + l.replace(/^[-*]\s+/, '') + '</li>').join('');
+        return '<ul>' + items + '</ul>';
+      }
+      return '<p>' + lines.join('<br>') + '</p>';
+    }).join('');
+  }
+
+  function addMessage(role, text) {
+    const msg = document.createElement('div');
+    msg.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (role === 'bot') {
+      bubble.innerHTML = formatMessage(text);
+    } else {
+      bubble.textContent = text;
+    }
+    msg.appendChild(bubble);
+
+    if (role === 'bot') {
+      const isUncertain = UNCERTAIN_MARKERS.some(m => text.toLowerCase().includes(m.toLowerCase()));
+      const tag = document.createElement('div');
+      tag.className = 'grounded-tag' + (isUncertain ? ' uncertain' : '');
+      tag.innerHTML = isUncertain
+        ? '⚠ Pointed you to an official source instead of guessing'
+        : '✓ Grounded in verified info';
+      msg.appendChild(tag);
+    }
+    chatArea.appendChild(msg);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  function showTyping() {
+    const t = document.createElement('div');
+    t.className = 'msg bot';
+    t.id = 'typingIndicator';
+    t.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+    chatArea.appendChild(t);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+  function hideTyping() {
+    const t = document.getElementById('typingIndicator');
+    if (t) t.remove();
+  }
+
+  async function sendMessage(text) {
+    if (!text.trim()) return;
+    addMessage('user', text);
+    history.push({ role: 'user', content: text });
+    userInput.value = '';
+    sendBtn.disabled = true;
+    showTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history })
+      });
+      const data = await res.json();
+      hideTyping();
+      const reply = data.reply || "Sorry, something went wrong. Please try again.";
+      addMessage('bot', reply);
+      history.push({ role: 'assistant', content: reply });
+    } catch (e) {
+      hideTyping();
+      addMessage('bot', "Connection issue — please try again in a moment.");
+    }
+    sendBtn.disabled = false;
+  }
+
+  sendBtn.addEventListener('click', () => sendMessage(userInput.value));
+  userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(userInput.value); });
+  quickRow.addEventListener('click', (e) => {
+    if (e.target.classList.contains('quick-btn')) sendMessage(e.target.dataset.q);
+  });
+
+  // Greeting
+  addMessage('bot', "Hi! I'm Kazuri — a career coach prototype for Safaricom internship candidates. Ask me anything about applying. If I don't have a confirmed answer, I'll say so instead of guessing.");
+</script>
+</body>
+</html>
