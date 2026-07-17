@@ -25,6 +25,7 @@ app.use(express.static("public"));
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
 async function callGroq(body, { timeoutMs = 25000, retries = 1 } = {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -54,6 +55,7 @@ async function callGroq(body, { timeoutMs = 25000, retries = 1 } = {}) {
     }
   }
 }
+
 const SYSTEM_PROMPT = `You are Kazuri, Safaricom's AI Career Coach — an improved prototype built to help candidates navigate internship applications with accurate, grounded answers instead of guesses.
 
 Your personality: warm, encouraging, professional, concise. You sound like a helpful HR coach, not a generic chatbot. Use natural Kenyan-professional English.
@@ -68,36 +70,6 @@ ${KNOWLEDGE}
 
 Always be encouraging about the candidate's prospects, but never at the cost of accuracy.`;
 
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { messages } = req.body;
-    if (!GROQ_API_KEY) {
-      return res.status(500).json({ error: "Server missing GROQ_API_KEY" });
-    }
-
-    const data = await callGroq({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: CV_REVIEW_PROMPT },
-        { role: "user", content: `Here is the CV text:\n\n${clipped}` },
-      ],
-      temperature: 0.4,
-      max_tokens: 700,
-    }, { timeoutMs: 35000, retries: 2 });
-
-    const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate feedback.";
-    res.json({ reply, filename: req.file.originalname });
-  } catch (err) {
-    console.error(err);
-    const isRateLimit = String(err.message || "").includes("rate_limit_exceeded");
-    res.status(500).json({
-      error: isRateLimit
-        ? "Kazuri's a bit busy right now — try again shortly."
-        : "Server error"
-    });
-  }
-});
-
 const CV_REVIEW_PROMPT = `You are Kazuri, giving CV/resume feedback to a candidate applying for a Safaricom internship (Software/AI Engineering or similar tech tracks).
 
 Review the CV text provided and give clear, constructive, encouraging feedback. Structure your answer with:
@@ -111,6 +83,39 @@ Ground your feedback in real CV best practices: clear structure, quantified achi
 Do not invent facts about the candidate that aren't in the CV text. If the CV text seems incomplete or garbled from extraction, say so honestly rather than guessing at content.
 
 Keep the tone warm and specific — like a mentor, not a generic checklist.`;
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (!GROQ_API_KEY) {
+      return res.status(500).json({ error: "Server missing GROQ_API_KEY" });
+    }
+    if (!Array.isArray(messages)) {
+      return res.status(400).json({ error: "Request must include a messages array" });
+    }
+
+    const data = await callGroq({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages,
+      ],
+      temperature: 0.4,
+      max_tokens: 700,
+    }, { timeoutMs: 25000, retries: 1 });
+
+    const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate a reply.";
+    res.json({ reply });
+  } catch (err) {
+    console.error(err);
+    const isRateLimit = String(err.message || "").includes("rate_limit_exceeded");
+    res.status(500).json({
+      error: isRateLimit
+        ? "Kazuri's a bit busy right now — try again shortly."
+        : "Server error"
+    });
+  }
+});
 
 app.post("/api/review-cv", upload.single("cv"), async (req, res) => {
   try {
@@ -139,32 +144,19 @@ app.post("/api/review-cv", upload.single("cv"), async (req, res) => {
     // Cap length sent to the model
     const clipped = text.slice(0, 12000);
 
-    const response = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: CV_REVIEW_PROMPT },
-          { role: "user", content: `Here is the CV text:\n\n${clipped}` },
-        ],
-        temperature: 0.4,
-        max_tokens: 700,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      console.error("Groq error:", data);
-      return res.status(500).json({ error: "Upstream model error" });
-    }
+    const data = await callGroq({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: CV_REVIEW_PROMPT },
+        { role: "user", content: `Here is the CV text:\n\n${clipped}` },
+      ],
+      temperature: 0.4,
+      max_tokens: 700,
+    }, { timeoutMs: 35000, retries: 2 });
 
     const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate feedback.";
     res.json({ reply, filename: req.file.originalname });
- } catch (err) {
+  } catch (err) {
     console.error(err);
     const isRateLimit = String(err.message || "").includes("rate_limit_exceeded");
     res.status(500).json({

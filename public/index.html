@@ -288,11 +288,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history })
       });
+      
       const data = await res.json();
       hideTyping();
-      const reply = data.reply || "Sorry, something went wrong. Please try again.";
+      if (!res.ok) {
+        addMessage('bot', data.error || "Sorry, something went wrong. Please try again.");
+        return;
+      }
+      const reply = data.reply;
       addMessage('bot', reply);
       history.push({ role: 'assistant', content: reply });
+
     } catch (e) {
       hideTyping();
       addMessage('bot', "Connection issue — please try again in a moment.");
