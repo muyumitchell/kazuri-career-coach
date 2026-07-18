@@ -75,6 +75,7 @@
     gap: 14px;
     background:
       radial-gradient(circle at 10% 0%, rgba(0,166,81,0.04), transparent 40%);
+    transition: outline 0.15s ease, background 0.15s ease;
   }
   .msg { display: flex; flex-direction: column; max-width: 84%; animation: rise 0.25s ease; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -91,11 +92,42 @@
     border: 1px solid var(--border);
     border-top-left-radius: 4px;
     color: var(--ink);
+    font-size: 15px;
+    line-height: 1.6;
   }
+  .msg.bot .bubble p { margin: 0 0 10px; }
+  .msg.bot .bubble p:last-child { margin-bottom: 0; }
+  .msg.bot .bubble ul { margin: 2px 0 12px 0; padding: 0; list-style: none; }
+  .msg.bot .bubble ul:last-child { margin-bottom: 0; }
+  .msg.bot .bubble li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 6px;
+  }
+  .msg.bot .bubble li::before {
+    content: "";
+    position: absolute;
+    left: 2px; top: 8px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  .msg.bot .bubble h4 {
+    margin: 12px 0 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--green-deep);
+  }
+  .msg.bot .bubble h4:first-child { margin-top: 0; }
+  .msg.bot .bubble strong { color: var(--green-deep); font-weight: 700; }
   .msg.user .bubble {
     background: var(--green);
     color: #fff;
     border-top-right-radius: 4px;
+    font-size: 15px;
+    line-height: 1.5;
   }
   .grounded-tag {
     display: inline-flex; align-items: center; gap: 4px;
@@ -104,12 +136,16 @@
     opacity: 0.75;
   }
   .grounded-tag.uncertain { color: var(--amber); }
-  .grounded-tag svg { width: 11px; height: 11px; }
 
   .quick-row {
     display: flex; gap: 8px; flex-wrap: wrap;
     padding: 0 20px 14px;
+    max-height: 60px;
+    opacity: 1;
+    overflow: hidden;
+    transition: opacity 0.2s ease, max-height 0.2s ease, padding 0.2s ease;
   }
+  .quick-row.hidden { opacity: 0; max-height: 0; padding: 0 20px; pointer-events: none; }
   .quick-btn {
     font-size: 12.5px; padding: 7px 12px;
     border-radius: 18px; border: 1px solid var(--border);
@@ -153,14 +189,35 @@
     font-size: 17px;
     padding: 0;
     cursor: pointer;
+    position: relative;
   }
   #attachBtn:hover { background: #EFF6F1; border-color: var(--green); }
   #attachBtn:disabled { opacity: 0.5; cursor: default; }
+  #attachBtn.uploading .attach-icon { visibility: hidden; }
+  #attachBtn .spinner {
+    display: none;
+    position: absolute; top: 50%; left: 50%;
+    width: 16px; height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  #attachBtn.uploading .spinner { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .file-chip {
     display: inline-flex; align-items: center; gap: 6px;
-    background: #fff; border: 1px solid var(--border);
+    background: rgba(255,255,255,0.15); border: 1px solid transparent;
     padding: 6px 10px; border-radius: 10px;
-    font-size: 12.5px; color: var(--ink-soft);
+    font-size: 12.5px; color: #fff;
+  }
+
+  .dropzone-active {
+    outline: 2px dashed var(--green);
+    outline-offset: -8px;
+    background: rgba(0,166,81,0.06);
   }
 
   .typing { display: flex; gap: 4px; padding: 4px 0; }
@@ -176,7 +233,9 @@
   footer.credit {
     text-align: center; font-size: 10.5px; color: var(--ink-soft);
     padding: 8px 0 14px; background: #fff;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
   }
+  .reset-link { color: var(--green-deep); font-weight: 600; cursor: pointer; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -201,12 +260,18 @@
   </div>
 
   <div class="input-row">
-    <button id="attachBtn" title="Upload your CV for feedback" type="button">📎</button>
+    <button id="attachBtn" title="Upload your CV for feedback" type="button">
+      <span class="attach-icon">📎</span>
+      <span class="spinner"></span>
+    </button>
     <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display:none" />
-    <input type="text" id="userInput" placeholder="Ask about the internship..." />
+    <input type="text" id="userInput" placeholder="Ask about the internship..." maxlength="500" />
     <button id="sendBtn">Send</button>
   </div>
-  <footer class="credit">Portfolio prototype · not an official Safaricom product</footer>
+  <footer class="credit">
+    <span>Portfolio prototype · not an official Safaricom product</span>
+    <span class="reset-link" id="resetLink">New conversation</span>
+  </footer>
 </div>
 
 <script>
@@ -214,7 +279,12 @@
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
   const quickRow = document.getElementById('quickRow');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const resetLink = document.getElementById('resetLink');
 
+  const STORAGE_KEY = 'kazuri_conversation';
+  const GREETING = "Hi! I'm Kazuri — a career coach prototype for Safaricom internship candidates. Ask me anything about applying, or tap 📎 to upload your CV for feedback. If I don't have a confirmed answer, I'll say so instead of guessing.";
   let history = [];
 
   const UNCERTAIN_MARKERS = ["don't have that confirmed", "not confirmed", "isn't confirmed", "official Safaricom Careers portal", "don't know the exact", "can't confirm"];
@@ -223,17 +293,37 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function applyInline(text) {
+    return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
   function formatMessage(text) {
-    const escaped = escapeHtml(text);
+    const normalized = text.replace(/\n?(#{1,4}\s+)/g, '\n\n$1').trim();
+    const escaped = escapeHtml(normalized);
     const blocks = escaped.split(/\n\s*\n/);
     return blocks.map(block => {
       const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-      const isList = lines.length > 0 && lines.every(l => l.startsWith('- ') || l.startsWith('* '));
+      if (lines.length === 0) return '';
+      if (lines[0].startsWith('### ')) {
+        const header = applyInline(lines[0].replace(/^###\s+/, ''));
+        const rest = lines.slice(1);
+        let out = '<h4>' + header + '</h4>';
+        if (rest.length) {
+          const isList = rest.every(l => l.startsWith('- ') || l.startsWith('* '));
+          if (isList) {
+            out += '<ul>' + rest.map(l => '<li>' + applyInline(l.replace(/^[-*]\s+/, '')) + '</li>').join('') + '</ul>';
+          } else {
+            out += '<p>' + rest.map(applyInline).join('<br>') + '</p>';
+          }
+        }
+        return out;
+      }
+      const isList = lines.every(l => l.startsWith('- ') || l.startsWith('* '));
       if (isList) {
-        const items = lines.map(l => '<li>' + l.replace(/^[-*]\s+/, '') + '</li>').join('');
+        const items = lines.map(l => '<li>' + applyInline(l.replace(/^[-*]\s+/, '')) + '</li>').join('');
         return '<ul>' + items + '</ul>';
       }
-      return '<p>' + lines.join('<br>') + '</p>';
+      return '<p>' + lines.map(applyInline).join('<br>') + '</p>';
     }).join('');
   }
 
@@ -261,6 +351,14 @@
     chatArea.scrollTop = chatArea.scrollHeight;
   }
 
+  function addFileChip(filename) {
+    const chipMsg = document.createElement('div');
+    chipMsg.className = 'msg user';
+    chipMsg.innerHTML = '<div class="bubble"><span class="file-chip">📄 ' + escapeHtml(filename) + '</span></div>';
+    chatArea.appendChild(chipMsg);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
   function showTyping() {
     const t = document.createElement('div');
     t.className = 'msg bot';
@@ -274,10 +372,27 @@
     if (t) t.remove();
   }
 
+  function hideQuickRow() { quickRow.classList.add('hidden'); }
+
+  function persist() {
+    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(history)); } catch (e) {}
+  }
+
+  function startFresh() {
+    history = [];
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    chatArea.innerHTML = '';
+    quickRow.classList.remove('hidden');
+    addMessage('bot', GREETING);
+    userInput.focus();
+  }
+
   async function sendMessage(text) {
     if (!text.trim()) return;
+    hideQuickRow();
     addMessage('user', text);
     history.push({ role: 'user', content: text });
+    persist();
     userInput.value = '';
     sendBtn.disabled = true;
     showTyping();
@@ -288,22 +403,24 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history })
       });
-      
       const data = await res.json();
       hideTyping();
       if (!res.ok) {
         addMessage('bot', data.error || "Sorry, something went wrong. Please try again.");
+        sendBtn.disabled = false;
+        userInput.focus();
         return;
       }
       const reply = data.reply;
       addMessage('bot', reply);
       history.push({ role: 'assistant', content: reply });
-
+      persist();
     } catch (e) {
       hideTyping();
       addMessage('bot', "Connection issue — please try again in a moment.");
     }
     sendBtn.disabled = false;
+    userInput.focus();
   }
 
   sendBtn.addEventListener('click', () => sendMessage(userInput.value));
@@ -311,25 +428,18 @@
   quickRow.addEventListener('click', (e) => {
     if (e.target.classList.contains('quick-btn')) sendMessage(e.target.dataset.q);
   });
+  resetLink.addEventListener('click', startFresh);
 
   // --- CV upload & review ---
-  const attachBtn = document.getElementById('attachBtn');
-  const fileInput = document.getElementById('fileInput');
-
   attachBtn.addEventListener('click', () => fileInput.click());
 
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
+  async function handleCvFile(file) {
     if (!file) return;
-
-    // Show a "user uploaded" chip message
-    const chipMsg = document.createElement('div');
-    chipMsg.className = 'msg user';
-    chipMsg.innerHTML = '<div class="bubble"><span class="file-chip" style="background:rgba(255,255,255,0.15);color:#fff;border-color:transparent;">📄 ' + escapeHtml(file.name) + '</span></div>';
-    chatArea.appendChild(chipMsg);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    hideQuickRow();
+    addFileChip(file.name);
 
     attachBtn.disabled = true;
+    attachBtn.classList.add('uploading');
     sendBtn.disabled = true;
     showTyping();
 
@@ -340,22 +450,45 @@
       const res = await fetch('/api/review-cv', { method: 'POST', body: formData });
       const data = await res.json();
       hideTyping();
-      if (!res.ok) {
-        addMessage('bot', data.error || "Sorry, I couldn't review that file.");
-      } else {
-        addMessage('bot', data.reply);
-      }
+      addMessage('bot', res.ok ? data.reply : (data.error || "Sorry, I couldn't review that file."));
     } catch (e) {
       hideTyping();
       addMessage('bot', "Upload failed — please check your connection and try again.");
     }
     attachBtn.disabled = false;
+    attachBtn.classList.remove('uploading');
     sendBtn.disabled = false;
+  }
+
+  fileInput.addEventListener('change', () => {
+    handleCvFile(fileInput.files[0]);
     fileInput.value = '';
   });
 
-  // Greeting
-  addMessage('bot', "Hi! I'm Kazuri — a career coach prototype for Safaricom internship candidates. Ask me anything about applying, or tap 📎 to upload your CV for feedback. If I don't have a confirmed answer, I'll say so instead of guessing.");
+  ['dragover', 'dragenter'].forEach(evt => {
+    chatArea.addEventListener(evt, (e) => { e.preventDefault(); chatArea.classList.add('dropzone-active'); });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    chatArea.addEventListener(evt, (e) => { e.preventDefault(); chatArea.classList.remove('dropzone-active'); });
+  });
+  chatArea.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) handleCvFile(file);
+  });
+
+  // --- Boot ---
+  (function init() {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) {}
+    if (saved && Array.isArray(saved) && saved.length) {
+      history = saved;
+      hideQuickRow();
+      history.forEach(m => addMessage(m.role === 'user' ? 'user' : 'bot', m.content));
+    } else {
+      addMessage('bot', GREETING);
+    }
+    userInput.focus();
+  })();
 </script>
 </body>
 </html>
